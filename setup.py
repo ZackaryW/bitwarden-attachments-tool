@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name="bw-util",
-    version="1.1",
+    version="2.0.0",
     author="Zackary W",
     license="MIT",
     url="https://github.com/ZackaryW/bitwarden-attachments-tool",
@@ -21,6 +21,7 @@ setup(
     entry_points={
         "console_scripts": [
             'bw-export = bwexport:cli',
+            'bw-export-gui = bwexport_gui:main'
         ],
     }
 

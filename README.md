@@ -1,5 +1,8 @@
 # bitwarden-attachments-tool
 
+> A Gui client is also available now
+![image](https://user-images.githubusercontent.com/36378555/164945130-3ae45ec8-f0fd-40f2-ad27-b0343e9a9328.png)
+
 > This repo is based on https://github.com/ckabalan/bitwarden-attachment-exporter
 
 > Designed for personal use case but includes limited generic interfaces

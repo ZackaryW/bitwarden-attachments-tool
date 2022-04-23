@@ -206,6 +206,12 @@ class App(QtWidgets.QWidget):
         self.password.setText('')
         self.logger.clear()
 
+def main():
+    import sys
+    main = QtWidgets.QApplication(sys.argv)
+    app = App()
+    sys.exit(main.exec_())
+
 if __name__ == '__main__':
     import sys
     main = QtWidgets.QApplication(sys.argv)
