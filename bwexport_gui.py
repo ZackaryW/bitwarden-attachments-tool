@@ -4,6 +4,7 @@ import PyQt5
 from PyQt5 import QtWidgets, QtGui, QtCore
 from PyQt5.QtCore import Qt
 import core
+import sys
 
 """
 https://stackoverflow.com/questions/28655198/best-way-to-display-logs-in-pyqt
@@ -207,13 +208,11 @@ class App(QtWidgets.QWidget):
         self.logger.clear()
 
 def main():
-    import sys
     main = QtWidgets.QApplication(sys.argv)
     app = App()
     sys.exit(main.exec_())
 
 if __name__ == '__main__':
-    import sys
     main = QtWidgets.QApplication(sys.argv)
     app = App()
     sys.exit(main.exec_())
