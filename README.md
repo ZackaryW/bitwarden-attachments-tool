@@ -19,6 +19,10 @@ pip install bw-util
 ## 1. in shell
 ```
 bw-export [commands] [options]
+
+# gui version as
+
+bw-export-gui
 ```
 ## 2. (windows only) download release
 at https://github.com/ZackaryW/bitwarden-attachments-tool/releases

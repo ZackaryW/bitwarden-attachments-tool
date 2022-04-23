@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name="bw-util",
-    version="2.0.2",
+    version="2.0.3",
     author="Zackary W",
     license="MIT",
     url="https://github.com/ZackaryW/bitwarden-attachments-tool",
