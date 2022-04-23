@@ -1,98 +1,22 @@
+from email.policy import default
 from subprocess import Popen, PIPE
 import sys
 import click
 import os
 import logging
 import json
-
-def get_bw_path():
-    if "BW_PATH" in os.environ:
-        return os.environ["BW_PATH"]
-
-    if os.name == 'nt' and os.path.exists("./bw.exe"):
-        return "bw.exe"
-    
-    return None
-
-def remove_illegal_chars(s):
-    invalid = '<>:"/\|?*'
-
-    for c in invalid:
-        s = s.replace(c, '')
-    
-    return s
-
-bw_path = get_bw_path()
-
-def parse_comm(comm):
-    if not isinstance(comm, tuple):
-        return 
-    for c in comm:
-        if c is None:
-            continue
-
-        yield c.decode('utf-8')
-
-def _login(pw, username):
-    p = Popen([bw_path, 'login',username,pw], stdin=PIPE, stdout=PIPE, stderr=PIPE)
-    trigger_error = True
-    out = p.communicate()
-    for line in parse_comm(out):
-        if "already logged in" in line:
-            trigger_error = False
-
-    p.terminate()
-
-    if trigger_error:
-        return False
-    return True
-
-def _unlock(pw_byte):
-    p = Popen([bw_path, 'unlock'], stdin=PIPE, stdout=PIPE, shell=True)
-    out = p.communicate(input=pw_byte)
-    sessionkey = None
-    for line in parse_comm(out):
-        if "export BW_SESSION=" in line:
-            # get sessionkey
-            sessionkey = line.split('=')[1]
-            break
-            
-    p.terminate()
-
-    if sessionkey:
-        return sessionkey[1:-1]
-
-def _sync(pw_byte):
-    p = Popen([bw_path, 'sync'], stdin=PIPE, stdout=PIPE)
-    out = p.communicate(input=pw_byte)
-    p.terminate()
-    for line in parse_comm(out):
-        if "Syncing complete" in line:
-            return True
-
-    return False
-
-def _save_json(pw_byte, savepath):
-    p = Popen([bw_path, 'export', '--output', os.path.join(savepath, "bitwarden.json"), "--format","json"], stdin=PIPE, stdout=PIPE)
-    out = p.communicate(input=pw_byte)
-    for line in parse_comm(out):
-        if "Saved" in line:
-            break
-
-    if os.path.exists(os.path.join(savepath, "bitwarden.json")):
-        return True
-    else:
-        return False
+import core
 
 @click.group(invoke_without_command=True, chain=True)
 @click.option('--pw', default='', help='Password')
 @click.option('--session', default=None, help='Sessionkey')
 @click.option('--savepath', default='./export/', help='savepath')
-@click.option('--debug', default=0, help='Debug', type=int)
+@click.option('--debug', is_flag = True, help='Debug mode')
+@click.option('--debugpath', default=None, help='Debug to file', type=click.Path(exists=True))
 @click.option('--apppath', default=None, type=click.Path(exists=True), help='Path to bitwarden cli')
 @click.pass_context
-def cli(ctx : click.Context, pw, session, savepath, debug, apppath):
-    global bw_path
+def cli(ctx : click.Context, pw, session, savepath, debug, apppath, debugpath):
+    bw_path = core.bw_path
 
     if apppath is not None:
         bw_path = apppath
@@ -101,12 +25,12 @@ def cli(ctx : click.Context, pw, session, savepath, debug, apppath):
         print("cannot find bw cli")
         sys.exit(1)
 
-    if debug <= 0:
-        pass
-    elif debug == 1:
-        logging.basicConfig(level=logging.INFO, stream=sys.stdout)
-    elif debug >= 2:
+    if debug and debugpath is not None:
+        logging.basicConfig(filename=debugpath, level=logging.DEBUG)
+    elif debug:
         logging.basicConfig(level=logging.DEBUG, stream=sys.stdout)
+    else:
+        logging.basicConfig(level=logging.INFO, stream=sys.stdout)
 
     if ctx.invoked_subcommand is None:
         print("no subcommand given")
@@ -135,10 +59,23 @@ def cli(ctx : click.Context, pw, session, savepath, debug, apppath):
     ctx.call_on_close(on_close)
 
 @cli.command()
-@click.argument('username', required=True, type=str)
+@click.argument('username', type=str, default=None)
 @click.pass_context
 def login(ctx, username):
     print("> login")
+    
+    if "username" in ctx.obj:
+        new_username = ctx.obj['username']
+
+    if not username:
+        username = new_username
+
+    if not username:
+        username = input("username: ")
+
+    if not username:
+        print("no username given")
+        sys.exit(1)
 
     if 'pw' not in ctx.obj:
         pw = click.prompt("Password", hide_input=True)
@@ -146,7 +83,7 @@ def login(ctx, username):
         ctx.obj['pwb'] = str.encode(pw)
     else:
         pw = ctx.obj['pw']
-    if _login(pw, username):
+    if core.login(pw, username):
         print("Login successful")
     else:
         print("Login failed")
@@ -163,7 +100,7 @@ def sync(ctx):
     pw_byte = ctx.obj['pwb']
     pw = ctx.obj['pw']
 
-    if _sync(pw_byte):
+    if core.sync(pw_byte):
         print("Sync successful")
         
     else:
@@ -179,7 +116,7 @@ def unlock(ctx):
 
     pw_byte = ctx.obj['pwb']
 
-    if not(sessionkey:= _unlock(pw_byte)):
+    if not(sessionkey:= core.unlock(pw_byte)):
         print("unlock failed")
         sys.exit(1)
 
@@ -201,7 +138,7 @@ def saveJson(ctx):
         print("No password set")
         sys.exit(1)
 
-    if not _save_json(pw_byte, savepath):
+    if not core.save_json(pw_byte, savepath):
         print("Save failed")
         sys.exit(1)
 
@@ -222,45 +159,7 @@ def export(ctx, dump):
         print("No session set")
         sys.exit(1)
 
-    p = Popen([bw_path, "list" , "items" , "--session", session], stdin=PIPE, stdout=PIPE)    
-    out = p.communicate(input=pw_byte)[0]
-    out.decode('utf-8')
-    p.terminate()
-    json_data = json.loads(out)
-    # save to file
-    if dump:
-        with open(os.path.join(savepath, "bitwarden_list.json"), "w") as f:
-            json.dump(json_data, f, indent=4)
-
-    # parse
-    for item in json_data:
-        itemid = item['id']
-        # name strip for windows compatibility
-        i : str ="asfsafasf"
-
-        if "attachments" in item:
-            for attachment in item["attachments"]:
-                p = Popen(
-                    [
-                        bw_path, 
-                        "get" , 
-                        "attachment" , 
-                        attachment["fileName"], 
-                        "--itemid", itemid, 
-                        "--session", session,
-                        "--output", os.path.join(savepath, remove_illegal_chars(item["name"]), attachment["fileName"])
-                    ],
-                    stdin=PIPE, stdout=PIPE)
-                out = p.communicate(input=pw_byte)
-                for i, line in enumerate(parse_comm(out)):
-                    if i == 0:
-                        print(line)
-                    else:
-                        logging.debug(line)
-                    
-                p.terminate()
-        # open folder in explorer
-        os.startfile(os.path.join(savepath))
+    core.export(pw_byte, savepath, session, dump)
 
 @cli.command()
 @click.pass_context
