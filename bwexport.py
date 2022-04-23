@@ -135,13 +135,11 @@ def cli(ctx : click.Context, pw, session, savepath, debug, apppath):
     ctx.call_on_close(on_close)
 
 @cli.command()
-@click.option('--username', default='', help='Username')
+@click.argument('username', required=True, type=str)
 @click.pass_context
 def login(ctx, username):
     print("> login")
 
-    if not username:
-        username = click.prompt("Username")
     if 'pw' not in ctx.obj:
         pw = click.prompt("Password", hide_input=True)
         ctx.obj['pw'] = pw
