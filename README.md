@@ -1,3 +1,5 @@
+# Merged to https://github.com/ZackaryW/bitwarden-utils
+
 # bitwarden-attachments-tool
 
 > A Gui client is also available now
